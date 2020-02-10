@@ -65,7 +65,7 @@ def get_arg_parser(title):
 		data_group.add_argument('--base_alg', type=str, default='EJF', choices=['EJF', 'SJF', 'random'])
 		data_group.add_argument('--value_loss_coef', type=float, default=50.0)
 		data_group.add_argument('--gamma', type=float, default=0.0)
-	elif title == 'vrp':
+	elif title == 'vrp' or title == 'tsp':
 		data_group.add_argument('--train_dataset', type=str, default='../data/vrp/vrp_20_30_train.json')
 		data_group.add_argument('--val_dataset', type=str, default='../data/vrp/vrp_20_30_val.json')
 		data_group.add_argument('--test_dataset', type=str, default='../data/vrp/vrp_20_30_test.json')

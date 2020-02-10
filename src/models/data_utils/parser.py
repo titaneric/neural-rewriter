@@ -14,6 +14,9 @@ from .Seq import *
 from .Tree import *
 from .Dag import *
 from .utils import *
+from .Tour import *
+
+from models.data_utils.tsp_datasets import parse_line
 
 '''
 Halide Grammar:
@@ -233,3 +236,9 @@ class vrpParser(object):
 			cur_capacity = dm.vehicle_state[-1][1]
 		dm.add_route_node(0)
 		return dm
+
+class tspParser(object):
+	def parse(self, problem, debug=False):
+		self.is_debug = debug
+		return parse_line(problem)
+
