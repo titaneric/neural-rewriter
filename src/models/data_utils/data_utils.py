@@ -159,8 +159,10 @@ class tspDataProcessor(object):
 		else:
 			batch_idxes = np.random.choice(len(data), batch_size)
 		batch_data = []
+		batch_tour = []
 		for idx in batch_idxes:
 			problem = data[idx]
-			dm = self.parser.parse(problem)
+			dm, opt_tour = self.parser.parse(problem)
 			batch_data.append(dm)
-		return batch_data
+			batch_tour.append(opt_tour)
+		return batch_data, opt_tour

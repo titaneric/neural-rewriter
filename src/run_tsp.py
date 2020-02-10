@@ -22,7 +22,8 @@ def create_model(args):
 	if model.cuda_flag:
 		model = model.cuda()
 	model.share_memory()
-	model_supervisor = model_utils.tspSupervisor(model, args)
+	# We can directly use the supervisor from VRP
+	model_supervisor = model_utils.vrpSupervisor(model, args)
 	if args.load_model:
 		model_supervisor.load_pretrained(args.load_model)
 	elif args.resume:
@@ -37,15 +38,15 @@ def create_model(args):
 
 def train(args):
 	print('Training:')
-	args.batch_size = 1
 	train_data = load_ptr_dataset("train", 10)
 	train_data_size = len(train_data)
+
 	if args.train_proportion < 1.0:
 		random.shuffle(train_data)
 		train_data_size = int(train_data_size * args.train_proportion)
 		train_data = train_data[:train_data_size]
 
-	# eval_data = data_utils.load_dataset(args.val_dataset, args)
+	eval_data = load_ptr_dataset("test", 10)
 
 	DataProcessor = data_utils.tspDataProcessor()
 	model_supervisor = create_model(args)
@@ -68,31 +69,27 @@ def train(args):
 		for batch_idx in range(0+resume_step*resume_idx%train_data_size, train_data_size, args.batch_size):
 			resume_step = False
 			print(epoch, batch_idx)
-			batch_data = DataProcessor.get_batch(train_data, args.batch_size, batch_idx)
-			dm, opt = batch_data[0]
-			print(dm.tour, opt)
+			batch_data, batch_opt_tour = DataProcessor.get_batch(train_data, args.batch_size, batch_idx)
+			train_loss, train_reward = model_supervisor.train(batch_data)
+			print('train loss: %.4f train reward: %.4f' % (train_loss, train_reward))
 
-			break
-		break
-			# train_loss, train_reward = model_supervisor.train(batch_data)
-			# print('train loss: %.4f train reward: %.4f' % (train_loss, train_reward))
+			if model_supervisor.global_step % args.eval_every_n == 0:
+				eval_loss, eval_reward = model_supervisor.eval(eval_data, args.output_trace_flag, args.max_eval_size)
+				val_summary = {'avg_reward': eval_reward, 'global_step': model_supervisor.global_step}
+				logger.write_summary(val_summary)
+				model_supervisor.save_model()
 
-			# # if model_supervisor.global_step % args.eval_every_n == 0:
-			# # 	eval_loss, eval_reward = model_supervisor.eval(eval_data, args.output_trace_flag, args.max_eval_size)
-			# # 	val_summary = {'avg_reward': eval_reward, 'global_step': model_supervisor.global_step}
-			# # 	logger.write_summary(val_summary)
-			# # 	model_supervisor.save_model()
-
-			# if args.lr_decay_steps and model_supervisor.global_step % args.lr_decay_steps == 0:
-			# 	model_supervisor.model.lr_decay(args.lr_decay_rate)
-			# 	if model_supervisor.model.cont_prob > 0.01:
-			# 		model_supervisor.model.cont_prob *= 0.5
+			if args.lr_decay_steps and model_supervisor.global_step % args.lr_decay_steps == 0:
+				model_supervisor.model.lr_decay(args.lr_decay_rate)
+				if model_supervisor.model.cont_prob > 0.01:
+					model_supervisor.model.cont_prob *= 0.5
 
 
 def evaluate(args):
 	print('Evaluation:')
 
-	test_data = data_utils.load_dataset(args.test_dataset, args)
+	test_data = load_ptr_dataset("test", 10)
+
 	test_data_size = len(test_data)
 	args.dropout_rate = 0.0
 
@@ -108,6 +105,7 @@ if __name__ == "__main__":
 	argParser = arguments.get_arg_parser("vrp")
 	args = argParser.parse_args()
 	args.cuda = not args.cpu and torch.cuda.is_available()
+	args.embedding_size = 5
 	random.seed(args.seed)
 	np.random.seed(args.seed)
 	if args.eval:

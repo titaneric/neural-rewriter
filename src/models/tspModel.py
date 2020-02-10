@@ -41,9 +41,15 @@ class tspModel(BaseModel):
 		self.sqrt_attention_size = int(np.sqrt(self.attention_size))
 		self.reward_thres = -0.01
 		self.input_encoder = tspInputEncoder.TourLSTM(args)
-		self.policy_embedding = mlp.MLPModel(self.num_MLP_layers, self.LSTM_hidden_size * 6 + self.embedding_size * 2, self.MLP_hidden_size, self.attention_size, self.cuda_flag, self.dropout_rate)
-		self.policy = mlp.MLPModel(self.num_MLP_layers, self.LSTM_hidden_size * 4, self.MLP_hidden_size, self.attention_size, self.cuda_flag, self.dropout_rate)
-		self.value_estimator = mlp.MLPModel(self.num_MLP_layers, self.LSTM_hidden_size * 4, self.MLP_hidden_size, 1, self.cuda_flag, self.dropout_rate)
+		self.policy_embedding = mlp.MLPModel(self.num_MLP_layers, self.LSTM_hidden_size * 4 + self.embedding_size, self.MLP_hidden_size, self.attention_size, self.cuda_flag, self.dropout_rate)
+
+		"""
+			value estimator and policy input size is only self.LSTM_hidden_size * 2
+			because it contains only cur_node embedding
+			x2 due to bi-directional LSTM
+		"""
+		self.policy = mlp.MLPModel(self.num_MLP_layers, self.LSTM_hidden_size * 2, self.MLP_hidden_size, self.attention_size, self.cuda_flag, self.dropout_rate)
+		self.value_estimator = mlp.MLPModel(self.num_MLP_layers, self.LSTM_hidden_size * 2, self.MLP_hidden_size, 1, self.cuda_flag, self.dropout_rate)
 		self.rewriter = tspRewriter()
 
 		if args.optimizer == 'adam':
@@ -181,6 +187,10 @@ class tspModel(BaseModel):
 			reduce_steps += 1
 			node_idxes = []
 			node_states = []
+			"""
+				Prepare batch size node embeddings
+				Resume it after feeding to value estimator
+			"""
 			for dm_idx in range(batch_size):
 				dm = dm_list[dm_idx]
 				for i in range(len(dm.tour)):
@@ -195,10 +205,14 @@ class tspModel(BaseModel):
 				cur_pred_rewards = self.value_estimator(torch.cat([cur_node_states], dim=1))
 				pred_rewards.append(cur_pred_rewards)
 			pred_rewards = torch.cat(pred_rewards, 0)
+
+			# For every graph, append the node index and corresponding value
 			candidate_rewrite_pos = [[] for _ in range(batch_size)]
+
 			for idx, (dm_idx, node_idx) in enumerate(node_idxes):
 				candidate_rewrite_pos[dm_idx].append((pred_rewards[idx].data[0], pred_rewards[idx], node_idx))
 
+			# Batch size rewrite
 			candidate_dm, candidate_rewrite_rec = self.batch_rewrite(dm_list, trace_rec, candidate_rewrite_pos, eval_flag, max_search_pos=1, reward_thres=self.reward_thres)
 			for dm_idx in range(batch_size):
 				cur_candidate_dm = candidate_dm[dm_idx]

@@ -82,7 +82,7 @@ def run_insertion(loc, method, dm):
         mask[a] = True
 
         if not dm.tour:
-            dm.tour = [a]
+            dm.add_route_node(a, 0)
         else:
             # Find index with least insert cost
             ind_insert = np.argmin(
@@ -95,5 +95,6 @@ def run_insertion(loc, method, dm):
             )
             dm.add_route_node(a, ind_insert + 1)
 
-    cost = D[dm.tour, np.roll(dm.tour, -1)].sum()
+    # cost = D[dm.tour, np.roll(dm.tour, -1)].sum()
+    # print(cost)
     # return cost, np.array(dm.tour)

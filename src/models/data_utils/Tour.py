@@ -14,7 +14,7 @@ class TspNode:
         self.px = px
         self.py = py
         self.dis = dis
-        self.embedding = None if embedding is None else embedding.copy
+        self.embedding = None if embedding is None else embedding.copy()
 
 
 class TspManager(SeqManager):
@@ -57,6 +57,10 @@ class TspManager(SeqManager):
             neighbor_idxes.append(i)
         return neighbor_idxes
 
+    def calc_tour_len(self):
+        return sum(self.get_dis(self.get_node(n1), self.get_node(n2)) \
+            for n1, n2 in zip(self.tour, np.roll(self.tour, -1)))
+
     def add_route_node(self, node_idx, insert_p):
         """
             Add the node into solution
@@ -66,19 +70,28 @@ class TspManager(SeqManager):
         # route stores the node embedding
         # tour stores the node index (solution)
         # tot_dis stores the distance change
+
+        pre_insert = (insert_p - 1) % self.num_nodes
+        # next_insert = (insert_p + 1) % self.num_nodes
+
+        # def calc_diff(origin_dis, pre_insert, next_insert):
+        #     new_dis = self.get_dis(pre_insert, insert_p) + \
+        #         self.get_dis(insert_p, next_insert)
+        #     return new_dis - origin_dis
+
         node = self.get_node(node_idx)
         if not self.tour:
             pre_node_idx = 0
         else:
-            pre_node_idx = self.tour[-1]
+            pre_node_idx = self.tour[pre_insert]
         pre_node = self.get_node(pre_node_idx)
-        # self.tour.append(node_idx)
         self.tour.insert(insert_p, node_idx)
         cur_dis = self.get_dis(node, pre_node)
-        if not self.tot_dis:
-            self.tot_dis.append(cur_dis)
-        else:
-            self.tot_dis.append(self.tot_dis[-1] + cur_dis)
+        # if not self.tot_dis:
+        #     self.tot_dis.append(cur_dis)
+        # else:
+        #     self.tot_dis.append(self.tot_dis[-1] + calc_diff(cur_dis, pre_insert, next_insert))
+        self.tot_dis.append(self.calc_tour_len())
         new_node = TspNode(x=node.x, y=node.y,
                            px=pre_node.x, py=pre_node.y, dis=cur_dis)
         new_node.embedding = [new_node.x, new_node.y,
