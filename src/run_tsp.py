@@ -22,8 +22,7 @@ def create_model(args):
 	if model.cuda_flag:
 		model = model.cuda()
 	model.share_memory()
-	# We can directly use the supervisor from VRP
-	model_supervisor = model_utils.vrpSupervisor(model, args)
+	model_supervisor = model_utils.tspSupervisor(model, args)
 	if args.load_model:
 		model_supervisor.load_pretrained(args.load_model)
 	elif args.resume:
@@ -69,8 +68,9 @@ def train(args):
 		for batch_idx in range(0+resume_step*resume_idx%train_data_size, train_data_size, args.batch_size):
 			resume_step = False
 			print(epoch, batch_idx)
-			batch_data, batch_opt_tour = DataProcessor.get_batch(train_data, args.batch_size, batch_idx)
+			batch_data = DataProcessor.get_batch(train_data, args.batch_size, batch_idx)
 			train_loss, train_reward = model_supervisor.train(batch_data)
+
 			print('train loss: %.4f train reward: %.4f' % (train_loss, train_reward))
 
 			if model_supervisor.global_step % args.eval_every_n == 0:
@@ -93,7 +93,7 @@ def evaluate(args):
 	test_data_size = len(test_data)
 	args.dropout_rate = 0.0
 
-	dataProcessor = data_utils.vrpDataProcessor()
+	dataProcessor = data_utils.tspDataProcessor()
 	model_supervisor = create_model(args)
 	test_loss, test_reward = model_supervisor.eval(test_data, args.output_trace_flag)
 
@@ -106,6 +106,8 @@ if __name__ == "__main__":
 	args = argParser.parse_args()
 	args.cuda = not args.cpu and torch.cuda.is_available()
 	args.embedding_size = 5
+	args.batch_size = 128
+
 	random.seed(args.seed)
 	np.random.seed(args.seed)
 	if args.eval:

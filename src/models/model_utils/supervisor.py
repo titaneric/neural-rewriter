@@ -347,3 +347,36 @@ class vrpSupervisor(Supervisor):
 		avg_reward = cum_reward / data_size
 		print('average pred reward: %.4f' % avg_reward)
 		return avg_loss, avg_reward
+
+class tspSupervisor(vrpSupervisor):
+	"""
+	Management class for TSP.
+	"""
+	def __init__(self, model, args):
+		super(tspSupervisor, self).__init__(model, args)
+		self.DataProcessor = data_utils.tspDataProcessor()
+
+	def batch_eval(self, eval_data, output_trace_flag, process_idx):
+		cum_loss = 0
+		cum_reward = 0
+		data_size = len(eval_data)
+
+		for batch_idx in range(0, data_size, self.batch_size):
+			batch_data = self.DataProcessor.get_batch(eval_data, self.batch_size, batch_idx)
+			cur_avg_loss, cur_avg_reward, dm_rec = self.model(batch_data, eval_flag=True)
+			cum_loss += cur_avg_loss.item() * len(batch_data)
+			cum_reward += cur_avg_reward * len(batch_data)
+			if output_trace_flag == 'complete':
+				for cur_dm_rec in dm_rec:
+					for i in range(len(cur_dm_rec)):
+						print('step ' + str(i))
+						dm = cur_dm_rec[i]
+						print(dm.tot_dis[-1])
+						for j in range(len(dm.tour)):
+							cur_pos = dm.tour[j]
+							cur_node = dm.get_node(cur_pos)
+							print(cur_node.x, cur_node.y, dm.tot_dis[j])
+						print('')
+			print('process start idx: %d batch idx: %d pred reward: %.4f' \
+				% (process_idx, batch_idx, cur_avg_reward))
+		return cum_loss, cum_reward

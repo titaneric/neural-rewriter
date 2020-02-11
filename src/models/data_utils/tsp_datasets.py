@@ -32,7 +32,8 @@ def parse_line(line):
     dm.num_nodes = len(dm.nodes)
     tour.pop()
     run_insertion(graph, "random", dm)
-    return dm, np.array(tour) - 1
+    dm.opt_tour = np.array(tour) - 1
+    return dm
 
 
 """

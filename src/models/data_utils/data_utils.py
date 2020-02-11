@@ -148,21 +148,6 @@ class vrpDataProcessor(object):
 		return batch_data
 
 
-class tspDataProcessor(object):
+class tspDataProcessor(vrpDataProcessor):
 	def __init__(self):
 		self.parser = tspParser()
-
-	def get_batch(self, data, batch_size, start_idx=None):
-		data_size = len(data)
-		if start_idx is not None:
-			batch_idxes = [i for i in range(start_idx, min(data_size, start_idx + batch_size))]
-		else:
-			batch_idxes = np.random.choice(len(data), batch_size)
-		batch_data = []
-		batch_tour = []
-		for idx in batch_idxes:
-			problem = data[idx]
-			dm, opt_tour = self.parser.parse(problem)
-			batch_data.append(dm)
-			batch_tour.append(opt_tour)
-		return batch_data, opt_tour

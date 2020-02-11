@@ -22,6 +22,7 @@ class TspManager(SeqManager):
         super().__init__()
         self.route = []
         self.tour = []
+        self.opt_tour = []
         self.tot_dis = []
         self.encoder_outputs = None
 
