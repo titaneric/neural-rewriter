@@ -41,14 +41,13 @@ class tspModel(BaseModel):
 		self.sqrt_attention_size = int(np.sqrt(self.attention_size))
 		self.reward_thres = -0.01
 		self.input_encoder = tspInputEncoder.TourLSTM(args)
+		# `policy_embedding` input is cur_state, neighbor state and embedding
 		self.policy_embedding = mlp.MLPModel(self.num_MLP_layers, self.LSTM_hidden_size * 4 + self.embedding_size, self.MLP_hidden_size, self.attention_size, self.cuda_flag, self.dropout_rate)
 
-		"""
-			value estimator and policy input size is only self.LSTM_hidden_size * 2
-			because it contains only cur_node embedding
-			x2 due to bi-directional LSTM
-		"""
+		# `policy` input is only `cur_state`
 		self.policy = mlp.MLPModel(self.num_MLP_layers, self.LSTM_hidden_size * 2, self.MLP_hidden_size, self.attention_size, self.cuda_flag, self.dropout_rate)
+
+		# `value_estimator` input is only `cur_state`
 		self.value_estimator = mlp.MLPModel(self.num_MLP_layers, self.LSTM_hidden_size * 2, self.MLP_hidden_size, 1, self.cuda_flag, self.dropout_rate)
 		self.rewriter = tspRewriter()
 
@@ -108,8 +107,11 @@ class tspModel(BaseModel):
 			candidate_neighbor_idxes = dm.get_neighbor_idxes(rewrite_pos)
 			cur_node_idx = dm.tour[rewrite_pos]
 			cur_node = dm.get_node(cur_node_idx)
-			pre_node_idx = dm.tour[rewrite_pos - 1]
+			pre_node_idx = dm.tour[(rewrite_pos - 1) % len(dm.tour)]
 			pre_node = dm.get_node(pre_node_idx)
+
+			next_node_idx = dm.tour[(rewrite_pos + 1) % len(dm.tour)]
+			next_node = dm.get_node(next_node_idx)
 			# cur_state is the current rewrite_pos embedding
 			cur_state = dm.encoder_outputs[rewrite_pos].unsqueeze(0)
 			# cur_states_1 stores the cur_state embedding
@@ -123,7 +125,10 @@ class tspModel(BaseModel):
 				neighbor_node = dm.get_node(neighbor_idx)
 				cur_states_1.append(cur_state.clone())
 				cur_states_2.append(dm.encoder_outputs[i].unsqueeze(0))
-				new_embedding = [neighbor_node.x, neighbor_node.y, pre_node.x, pre_node.y, dm.get_dis(pre_node, neighbor_node)]
+				new_embedding = [
+					neighbor_node.x, neighbor_node.y, 
+					pre_node.x, pre_node.y, dm.get_dis(pre_node, neighbor_node),
+					next_node.x, next_node.y, dm.get_dis(next_node, neighbor_node),]
 				new_embeddings.append(new_embedding[:])				
 			cur_states_1 = torch.cat(cur_states_1, 0)
 			cur_states_2 = torch.cat(cur_states_2, 0)
@@ -230,14 +235,14 @@ class tspModel(BaseModel):
 				cur_node_states = node_states[st: st + self.batch_size]
 				cur_node_states = torch.cat(cur_node_states, 0)
 				"""
-					For current value estimator, we only use the node embedding because
+					For current value estimator, we only use the index embedding because
 					TSP have no depot information.
 				"""
 				cur_pred_rewards = self.value_estimator(torch.cat([cur_node_states], dim=1))
 				pred_rewards.append(cur_pred_rewards)
 			pred_rewards = torch.cat(pred_rewards, 0)
 
-			# For every instance, append the node index and corresponding estimated value
+			# For every instance, append the tour index and corresponding estimated value
 			candidate_rewrite_pos = [[] for _ in range(batch_size)]
 
 			for idx, (dm_idx, node_idx) in enumerate(node_idxes):

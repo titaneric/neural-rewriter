@@ -46,7 +46,7 @@ def train(args):
 		train_data = train_data[:train_data_size]
 
 	eval_data = load_ptr_dataset("test", 10)
-
+	# args.batch_size = 1
 	DataProcessor = data_utils.tspDataProcessor()
 	model_supervisor = create_model(args)
 
@@ -105,7 +105,8 @@ if __name__ == "__main__":
 	argParser = arguments.get_arg_parser("vrp")
 	args = argParser.parse_args()
 	args.cuda = not args.cpu and torch.cuda.is_available()
-	args.embedding_size = 5
+	# node coords, pre_node coords, next_node coords, dis(node, pre_node), dis(node, next_node)
+	args.embedding_size = 2 + 2 + 2 + 1 + 1
 	args.batch_size = 128
 
 	random.seed(args.seed)

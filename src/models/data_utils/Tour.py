@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 
 from models.data_utils.Seq import SeqManager
@@ -8,12 +10,18 @@ class TspNode:
     Class to represent the node in 2d space
     """
 
-    def __init__(self, x, y, px, py, dis, embedding=None):
+    def __init__(self, x, y, embedding=None):
         self.x = x
         self.y = y
-        self.px = px
-        self.py = py
-        self.dis = dis
+
+        self.px = None
+        self.py = None
+        self.pdis = None
+
+        self.nx = None
+        self.ny = None
+        self.ndis = None
+
         self.embedding = None if embedding is None else embedding.copy()
 
 
@@ -30,8 +38,7 @@ class TspManager(SeqManager):
         res = TspManager()
         res.nodes = []
         for i, node in enumerate(self.nodes):
-            res.nodes.append(TspNode(x=node.x, y=node.y, px=node.px,
-                                     py=node.py, dis=node.dis, embedding=node.embedding))
+            res.nodes.append(copy.copy(node))
         res.num_nodes = self.num_nodes
         res.route = self.route[:]
         res.tour = self.tour[:]
@@ -59,44 +66,43 @@ class TspManager(SeqManager):
         return neighbor_idxes
 
     def calc_tour_len(self):
-        return sum(self.get_dis(self.get_node(n1), self.get_node(n2)) \
-            for n1, n2 in zip(self.tour, np.roll(self.tour, -1)))
+        return sum(self.get_dis(self.get_node(n1), self.get_node(n2))
+                   for n1, n2 in zip(self.tour, np.roll(self.tour, -1)))
+
+    def update_node_info(self):
+        """ 
+            Only be called when the tour is completed
+        """
+        for i, (node_idx, next_node_idx, pre_node_idx) in enumerate(zip(
+            self.tour, np.roll(self.tour, -1), np.roll(self.tour, 1))):
+            node = self.get_node(node_idx)
+
+            next_node = self.get_node(next_node_idx)
+            ndis = self.get_dis(node, next_node)
+            node.nx = next_node.x
+            node.ny = next_node.y
+            node.ndis = ndis
+
+            pre_node = self.get_node(pre_node_idx)
+            pdis = self.get_dis(node, pre_node)
+            node.px = pre_node.x
+            node.py = pre_node.y
+            node.pdis = pdis
+
+            node.embedding = [node.x, node.y,
+                         node.px, node.py, node.pdis,
+                         node.nx, node.ny, node.ndis]
+            self.route[i] = node.embedding[:]
 
     def add_route_node(self, node_idx, insert_p):
         """
             Add the node into solution
-            Node embedding is
-            [node.x, node.y, pre_node.x, pre_node.y, dis(node, pre_node)]
         """
-        # route stores the node embedding
+        # route stores the index embedding
         # tour stores the node index (solution)
         # tot_dis stores the distance change
 
-        pre_insert = (insert_p - 1) % self.num_nodes
-        # next_insert = (insert_p + 1) % self.num_nodes
-
-        # def calc_diff(origin_dis, pre_insert, next_insert):
-        #     new_dis = self.get_dis(pre_insert, insert_p) + \
-        #         self.get_dis(insert_p, next_insert)
-        #     return new_dis - origin_dis
-
-        node = self.get_node(node_idx)
-        if not self.tour:
-            pre_node_idx = 0
-        else:
-            pre_node_idx = self.tour[pre_insert]
-        pre_node = self.get_node(pre_node_idx)
         self.tour.insert(insert_p, node_idx)
-        cur_dis = self.get_dis(node, pre_node)
-        # if not self.tot_dis:
-        #     self.tot_dis.append(cur_dis)
-        # else:
-        #     self.tot_dis.append(self.tot_dis[-1] + calc_diff(cur_dis, pre_insert, next_insert))
+        self.route.insert(insert_p, None)
         self.tot_dis.append(self.calc_tour_len())
-        new_node = TspNode(x=node.x, y=node.y,
-                           px=pre_node.x, py=pre_node.y, dis=cur_dis)
-        new_node.embedding = [new_node.x, new_node.y,
-                              new_node.px, new_node.py, new_node.dis]
-        self.nodes[node_idx] = new_node
-        # self.route.append(new_node.embedding[:])
-        self.route.insert(insert_p, new_node.embedding[:])
+

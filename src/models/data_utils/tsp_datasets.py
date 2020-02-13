@@ -26,13 +26,15 @@ def parse_line(line):
         x, y = float(x), float(y)
         graph.append([x, y])
 
-        node = TspNode(x=x, y=y, px=x, py=y, dis=0.0)
+        node = TspNode(x=x, y=y)
         dm.nodes.append(node)
     
     dm.num_nodes = len(dm.nodes)
     tour.pop()
     run_insertion(graph, "random", dm)
     dm.opt_tour = np.array(tour) - 1
+    dm.update_node_info()
+
     return dm
 
 
